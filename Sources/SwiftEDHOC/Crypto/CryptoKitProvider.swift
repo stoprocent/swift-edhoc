@@ -54,6 +54,9 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             if peerPublicKey.count == 32 {
                 // 32 bytes = x-coordinate only (from wire per RFC 9528); reconstruct point
                 publicKey = try P256.KeyAgreement.PublicKey(compactRepresentation: peerPublicKey)
+            } else if peerPublicKey.count == 65 && peerPublicKey[0] == 0x04 {
+                // 65 bytes = 0x04 || x || y (already X9.63 uncompressed)
+                publicKey = try P256.KeyAgreement.PublicKey(x963Representation: peerPublicKey)
             } else {
                 // 64 bytes = x||y (from certificate); prepend 0x04 for X9.63 format
                 var x963Data = Data([0x04])
@@ -99,7 +102,11 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             let p256PubKey: P256.Signing.PublicKey
             if publicKey.count == 32 {
                 p256PubKey = try P256.Signing.PublicKey(compactRepresentation: publicKey)
+            } else if publicKey.count == 65 && publicKey[0] == 0x04 {
+                // 65 bytes = 0x04 || x || y (already X9.63 uncompressed)
+                p256PubKey = try P256.Signing.PublicKey(x963Representation: publicKey)
             } else {
+                // 64 bytes = x||y (from certificate); prepend 0x04 for X9.63 format
                 var x963Data = Data([0x04])
                 x963Data.append(publicKey)
                 p256PubKey = try P256.Signing.PublicKey(x963Representation: x963Data)
