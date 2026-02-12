@@ -32,6 +32,12 @@ private final class VectorsCryptoProvider: EdhocCryptoProvider, @unchecked Senda
             let privKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
             let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(32))
             return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .p384:
+            let privKey = try P384.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
+            let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(48))
+            return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .x448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 
@@ -343,7 +349,7 @@ final class RFC9529VectorTests: XCTestCase {
 
     // MARK: - Test: Connection IDs match expected byte representations
 
-    func testConnectionIDByteRepresentation() {
+    func testConnectionIDByteRepresentation() throws {
         // Initiator connection ID: integer(-14) => CBOR encoding byte = 0x20 | 13 = 0x2d
         let iCID = EdhocConnectionID.integer(-14)
         XCTAssertEqual(iCID.toBytes(), Data([0x2d]),

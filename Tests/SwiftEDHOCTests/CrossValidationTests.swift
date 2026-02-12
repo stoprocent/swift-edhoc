@@ -88,6 +88,42 @@ final class CrossValidationTests: XCTestCase {
     private static let m2_expectedPRK3e2m = "fbe3873abe6d8d24fb2324387fdd04eeccd1ea64fd49abdc98804bd23efcbf18"
     private static let m2_expectedMAC2 = "7b815c4fe241ac2492d95d548150e11fc874006398e2c901a91d62c6dd726ec8"
 
+    // MARK: - TS-generated vectors for Method 3 (StaticDH/StaticDH, Suite 24)
+
+    private static let s24_initiatorStaticPrivate = Data(hexString:
+        "fc91fd858a716e23dd986c099dad2ca3e38b88b4f8ff5f55a5c832f4f0c5f53d11ac1306d529a0ae7572ee08f825f9a0"
+    )
+    private static let s24_initiatorStaticPublic = Data(hexString:
+        "b07bfe1fedbfaaee13bfce023b20a6ca8aede6aed276a712a227b3485685f4c8cecb645392a388a006eeb26b6dd36ebd"
+    )
+    private static let s24_responderStaticPrivate = Data(hexString:
+        "c999da242b76987acf88528682e5f357c0dfab64858a93628b3d5c25a5edc137c4191f27a121410311f1d921cf553d45"
+    )
+    private static let s24_responderStaticPublic = Data(hexString:
+        "50ea21a9df73bd6eec3822cdea696bca27dea1eb451c4a14f58cb52c0c8ad2047d6efaa5d33a6340b7f420a0fbeae713"
+    )
+    private static let s24_initiatorEphemeral = Data(hexString:
+        "ff7bcadbf9909f1ca51ace28a9963bc203b0ccb65fc220814c31640476bc424858e6d8977417f07777208b09e37bde1d"
+    )
+    private static let s24_responderEphemeral = Data(hexString:
+        "ac398da13bd18641523961b516e9ef98f7fcaa73e7ad35dcb539901254385d600df8be8a7d31ec8628ece9b78346ae5e"
+    )
+    private static let s24_initiatorCCS = Data(hexString: "a20169737569746532342d69022b")
+    private static let s24_responderCCS = Data(hexString: "a20169737569746532342d720232")
+    private static let s24_expectedTH1 = "acc5df1fe2a637623d8c6c5dfade86ee9f7b9bddf6e4d48ab8ed6bb27302d8ae990eb338e630d3d28b405b4351f82882"
+    private static let s24_expectedTH2 = "2814b49151bffbcc8a0f04e7e5f01f5aced533dbf59ab55a36c74f2e781dbce4155de360873eafe08bac6b92e817d838"
+    private static let s24_expectedPRK2e = "4a17c50144980cac36fed02e6b2c07babf006c4915c8af96a6b0c02f88f7cb94e131ba96e6065c32551ac97b0a89a0e3"
+    private static let s24_expectedPRK3e2m = "c38c282075a7c49cc2ffd6fe726f7e0fb0705ccb9879ce4f395696f2810bbd26dd7045e25f790838b16959ef65fab757"
+    private static let s24_expectedMAC2 = "879c256594b4db11ca5f94188f802ab9"
+    private static let s24_expectedTH3 = "72df9ae885935ac41c1f68d4e89934cd8d8fa037aee513aee0cc04faba95792f92d7be00dc9790c30a143641c67d9009"
+    private static let s24_expectedPRK4e3m = "12bf142a062859298f6cb005205aace4136986c1337292e81a330d07b4f0a8a4f8b3cda2fa5d8c633d2ae8faa5fdc986"
+    private static let s24_expectedMAC3 = "5e919d51f046ea294ca3a048075d1b85"
+    private static let s24_expectedTH4 = "d3c8df19bdbedeee8bfa8210043a29e086e0c09aa372aa7995585be112aac77aa624d02903752a743b3b1c13b1e01822"
+    private static let s24_expectedMasterSecret = "b599e3b23e8d47d0bee0b79e60640ba8"
+    private static let s24_expectedMasterSalt = "06328515e03fde29"
+    private static let s24_expectedMasterSecretAfterUpdate = "d4d9afa1ae714b5d8a343164c4b75608"
+    private static let s24_expectedMasterSaltAfterUpdate = "abfc87f0e5643117"
+
     // MARK: - Deterministic crypto provider
 
     private func makeProvider(ephemeral: Data) -> VectorsCryptoProvider {
@@ -246,6 +282,95 @@ final class CrossValidationTests: XCTestCase {
                        "Method 2: Master salts must be identical")
         XCTAssertEqual(iOSCORE.senderId, rOSCORE.recipientId)
         XCTAssertEqual(iOSCORE.recipientId, rOSCORE.senderId)
+    }
+
+    // MARK: - Test: Method 3 cross-validation for Suite 24 (fully deterministic)
+
+    func testMethod3Suite24CrossValidation() async throws {
+        var iCredMgr = CCSCredentialProvider()
+        iCredMgr.addOwnCredential(
+            kid: .integer(-12),
+            ccsBytes: Self.s24_initiatorCCS,
+            publicKey: Self.s24_initiatorStaticPublic,
+            privateKey: Self.s24_initiatorStaticPrivate
+        )
+        iCredMgr.addPeerCredential(
+            kid: .integer(-19),
+            ccsBytes: Self.s24_responderCCS,
+            publicKey: Self.s24_responderStaticPublic
+        )
+
+        var rCredMgr = CCSCredentialProvider()
+        rCredMgr.addOwnCredential(
+            kid: .integer(-19),
+            ccsBytes: Self.s24_responderCCS,
+            publicKey: Self.s24_responderStaticPublic,
+            privateKey: Self.s24_responderStaticPrivate
+        )
+        rCredMgr.addPeerCredential(
+            kid: .integer(-12),
+            ccsBytes: Self.s24_initiatorCCS,
+            publicKey: Self.s24_initiatorStaticPublic
+        )
+
+        let iCrypto = makeProvider(ephemeral: Self.s24_initiatorEphemeral)
+        let rCrypto = makeProvider(ephemeral: Self.s24_responderEphemeral)
+
+        var iLog: [(String, String)] = []
+        var rLog: [(String, String)] = []
+
+        let initiator = EdhocSession(
+            connectionID: .integer(10),
+            methods: [.method3],
+            cipherSuites: [.suite24],
+            credentialProvider: iCredMgr,
+            cryptoProvider: iCrypto,
+            logger: { name, data in iLog.append((name, data.map { String(format: "%02x", $0) }.joined())) }
+        )
+        let responder = EdhocSession(
+            connectionID: .integer(20),
+            methods: [.method3],
+            cipherSuites: [.suite24],
+            credentialProvider: rCredMgr,
+            cryptoProvider: rCrypto,
+            logger: { name, data in rLog.append((name, data.map { String(format: "%02x", $0) }.joined())) }
+        )
+
+        let msg1 = try await initiator.composeMessage1()
+        _ = try await responder.processMessage1(msg1)
+        let msg2 = try await responder.composeMessage2()
+        _ = try await initiator.processMessage2(msg2)
+        let msg3 = try await initiator.composeMessage3()
+        _ = try await responder.processMessage3(msg3)
+
+        func iVal(_ key: String) -> String? { iLog.first(where: { $0.0 == key })?.1 }
+        func rVal(_ key: String) -> String? { rLog.first(where: { $0.0 == key })?.1 }
+
+        XCTAssertEqual(iVal("TH_1"), Self.s24_expectedTH1)
+        XCTAssertEqual(iVal("TH_2"), Self.s24_expectedTH2)
+        XCTAssertEqual(iVal("PRK_2e"), Self.s24_expectedPRK2e)
+        XCTAssertEqual(iVal("PRK_3e2m"), Self.s24_expectedPRK3e2m)
+        XCTAssertEqual(rVal("MAC_2"), Self.s24_expectedMAC2)
+        XCTAssertEqual(iVal("TH_3") ?? rVal("TH_3"), Self.s24_expectedTH3)
+        XCTAssertEqual(iVal("PRK_4e3m"), Self.s24_expectedPRK4e3m)
+        XCTAssertEqual(iVal("MAC_3"), Self.s24_expectedMAC3)
+        XCTAssertEqual(iVal("TH_4"), Self.s24_expectedTH4)
+
+        let iOSCORE = try await initiator.exportOSCORE()
+        let rOSCORE = try await responder.exportOSCORE()
+        XCTAssertEqual(iOSCORE.masterSecret, rOSCORE.masterSecret)
+        XCTAssertEqual(iOSCORE.masterSalt, rOSCORE.masterSalt)
+        XCTAssertEqual(hex(iOSCORE.masterSecret), Self.s24_expectedMasterSecret)
+        XCTAssertEqual(hex(iOSCORE.masterSalt), Self.s24_expectedMasterSalt)
+
+        try await initiator.keyUpdate(context: Self.keyUpdateContext)
+        try await responder.keyUpdate(context: Self.keyUpdateContext)
+        let iUpdated = try await initiator.exportOSCORE()
+        let rUpdated = try await responder.exportOSCORE()
+        XCTAssertEqual(iUpdated.masterSecret, rUpdated.masterSecret)
+        XCTAssertEqual(iUpdated.masterSalt, rUpdated.masterSalt)
+        XCTAssertEqual(hex(iUpdated.masterSecret), Self.s24_expectedMasterSecretAfterUpdate)
+        XCTAssertEqual(hex(iUpdated.masterSalt), Self.s24_expectedMasterSaltAfterUpdate)
     }
 
     // MARK: - Test: Generate Swift vectors for TypeScript consumption
@@ -424,6 +549,12 @@ private final class VectorsCryptoProvider: EdhocCryptoProvider, @unchecked Senda
             let privKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
             let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(32))
             return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .p384:
+            let privKey = try P384.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
+            let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(48))
+            return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .x448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 

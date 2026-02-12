@@ -176,16 +176,16 @@ final class CipherSuiteTests: XCTestCase {
         XCTAssertEqual(p.aeadIvLength, 12)
         XCTAssertEqual(p.hashLength, 48)
         XCTAssertEqual(p.macLength, 16)
-        XCTAssertEqual(p.eccKeyLength, 56)
-        XCTAssertEqual(p.eccSignLength, 114)
+        XCTAssertEqual(p.eccKeyLength, 48)
+        XCTAssertEqual(p.eccSignLength, 96)
     }
 
     func testSuite24Algorithms() {
         let p = EdhocCipherSuite.suite24.parameters
         XCTAssertEqual(p.aeadAlgorithm, .aesGCM256)
         XCTAssertEqual(p.hashAlgorithm, .sha384)
-        XCTAssertEqual(p.dhCurve, .p256)
-        XCTAssertEqual(p.signatureCurve, .p256)
+        XCTAssertEqual(p.dhCurve, .p384)
+        XCTAssertEqual(p.signatureCurve, .p384)
     }
 
     // MARK: - Suite 25
@@ -196,18 +196,18 @@ final class CipherSuiteTests: XCTestCase {
         XCTAssertEqual(p.aeadKeyLength, 32)
         XCTAssertEqual(p.aeadTagLength, 16)
         XCTAssertEqual(p.aeadIvLength, 12)
-        XCTAssertEqual(p.hashLength, 32)
+        XCTAssertEqual(p.hashLength, 64)
         XCTAssertEqual(p.macLength, 16)
-        XCTAssertEqual(p.eccKeyLength, 32)
-        XCTAssertEqual(p.eccSignLength, 64)
+        XCTAssertEqual(p.eccKeyLength, 56)
+        XCTAssertEqual(p.eccSignLength, 114)
     }
 
     func testSuite25Algorithms() {
         let p = EdhocCipherSuite.suite25.parameters
         XCTAssertEqual(p.aeadAlgorithm, .chaCha20Poly1305)
-        XCTAssertEqual(p.hashAlgorithm, .sha256)
-        XCTAssertEqual(p.dhCurve, .x25519)
-        XCTAssertEqual(p.signatureCurve, .ed25519)
+        XCTAssertEqual(p.hashAlgorithm, .shake256_512)
+        XCTAssertEqual(p.dhCurve, .x448)
+        XCTAssertEqual(p.signatureCurve, .ed448)
     }
 
     // MARK: - Raw value round-trip

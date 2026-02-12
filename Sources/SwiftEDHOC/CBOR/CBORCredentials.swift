@@ -144,7 +144,18 @@ public enum CBORCredentials {
                 case .negativeInt(let n):
                     return .kid(KIDCredential(kid: .integer(-1 - Int(n))))
                 case .byteString(let bytes):
-                    return .kid(KIDCredential(kid: .byteString(Data(bytes))))
+                    // For full-map kid form, value is bstr(cbor(kid)); decode inner CBOR.
+                    let inner = try CBORSerialization.decode(Data(bytes))
+                    switch inner {
+                    case .unsignedInt(let n):
+                        return .kid(KIDCredential(kid: .integer(Int(n))))
+                    case .negativeInt(let n):
+                        return .kid(KIDCredential(kid: .integer(-1 - Int(n))))
+                    case .byteString(let innerBytes):
+                        return .kid(KIDCredential(kid: .byteString(Data(innerBytes))))
+                    default:
+                        throw EdhocError.cborError("Invalid inner kid value in map")
+                    }
                 default:
                     throw EdhocError.cborError("Invalid kid value in map")
                 }

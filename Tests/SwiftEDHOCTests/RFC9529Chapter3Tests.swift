@@ -306,7 +306,7 @@ final class RFC9529Chapter3Tests: XCTestCase {
                        "DER CRED_x must be bstr-wrapped")
     }
 
-    func testConnectionIDToBytes() {
+    func testConnectionIDToBytes() throws {
         // C_I = -24: CBOR encoding byte = 0x20 | 23 = 0x37
         let cI = EdhocConnectionID.integer(-24)
         XCTAssertEqual(cI.toBytes(), Data([0x37]),
@@ -357,6 +357,12 @@ private final class Chapter3CryptoProvider: EdhocCryptoProvider, @unchecked Send
             let privKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
             let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(32))
             return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .p384:
+            let privKey = try P384.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
+            let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(48))
+            return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .x448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 

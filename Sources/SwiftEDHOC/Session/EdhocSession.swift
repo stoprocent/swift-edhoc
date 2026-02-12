@@ -106,11 +106,12 @@ public actor EdhocSession {
         try generateEphemeralKey()
 
         // Build message_1 CBOR sequence: METHOD, SUITES_I, G_X, C_I, ?EAD_1
+        let canonicalCID = try CBORUtils.canonicalizeConnectionID(connectionID)
         var parts: [CBOR] = [
             CBORSerialization.toCBOR(selectedMethod.rawValue),
             CBORSerialization.encodeSuites(cipherSuites, selected: selectedSuite),
             .byteString(Array(ephPub!)),
-            CBORUtils.connectionIDToCBOR(connectionID),
+            try CBORUtils.connectionIDToCBOR(canonicalCID),
         ]
         if let ead = ead {
             for token in ead {
@@ -259,7 +260,8 @@ public actor EdhocSession {
         log("PRK_3e2m", prk3e2m!)
 
         // MAC_2 with context_2 = << C_R, ID_CRED_R, TH_2, CRED_R, ?EAD_2 >>
-        let cRCbor = CBORSerialization.encode(CBORUtils.connectionIDToCBOR(connectionID))
+        let canonicalCID = try CBORUtils.canonicalizeConnectionID(connectionID)
+        let cRCbor = CBORSerialization.encode(try CBORUtils.connectionIDToCBOR(canonicalCID))
         let context2 = MessageHelpers.buildContext(
             cRCbor: cRCbor, idCredCbor: idCredRMap, th: th!, credXCbor: credRCbor, ead: ead)
         let mac2Len = KeySchedule.macLength(
@@ -387,7 +389,8 @@ public actor EdhocSession {
         log("PRK_3e2m", prk3e2m!)
 
         // Verify MAC_2 / Signature_or_MAC_2
-        let cRCbor = CBORSerialization.encode(CBORUtils.connectionIDToCBOR(peerConnectionID!))
+        let canonicalPeerCID = try CBORUtils.canonicalizeConnectionID(peerConnectionID!)
+        let cRCbor = CBORSerialization.encode(try CBORUtils.connectionIDToCBOR(canonicalPeerCID))
         let context2 = MessageHelpers.buildContext(
             cRCbor: cRCbor, idCredCbor: idCredRMap, th: th!, credXCbor: credRCbor,
             ead: parsed.ead.isEmpty ? nil : parsed.ead)

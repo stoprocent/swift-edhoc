@@ -241,6 +241,12 @@ private final class CLibVectorsCryptoProvider: EdhocCryptoProvider, @unchecked S
             let privKey = try CryptoKit.P256.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
             let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(32))
             return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .p384:
+            let privKey = try CryptoKit.P384.KeyAgreement.PrivateKey(rawRepresentation: deterministicEphemeralKey)
+            let pubKey = Data(privKey.publicKey.x963Representation.dropFirst().prefix(48))
+            return KeyPair(publicKey: pubKey, privateKey: deterministicEphemeralKey)
+        case .x448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 

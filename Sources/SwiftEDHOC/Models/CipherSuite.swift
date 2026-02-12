@@ -25,16 +25,21 @@ public enum AEADAlgorithm: Sendable {
 public enum DHCurve: Sendable {
     case x25519
     case p256
+    case p384
+    case x448
 }
 
 public enum SignatureCurve: Sendable {
     case ed25519
     case p256
+    case p384
+    case ed448
 }
 
 public enum HashAlgorithm: Sendable {
     case sha256
     case sha384
+    case shake256_512
 }
 
 /// Full set of parameters for a cipher suite
@@ -96,12 +101,12 @@ extension EdhocCipherSuite {
             return CipherSuiteParameters(
                 id: 24, aeadAlgorithm: .aesGCM256, aeadKeyLength: 32, aeadTagLength: 16,
                 aeadIvLength: 12, hashAlgorithm: .sha384, hashLength: 48, macLength: 16,
-                eccKeyLength: 56, eccSignLength: 114, dhCurve: .p256, signatureCurve: .p256)
+                eccKeyLength: 48, eccSignLength: 96, dhCurve: .p384, signatureCurve: .p384)
         case .suite25:
             return CipherSuiteParameters(
                 id: 25, aeadAlgorithm: .chaCha20Poly1305, aeadKeyLength: 32, aeadTagLength: 16,
-                aeadIvLength: 12, hashAlgorithm: .sha256, hashLength: 32, macLength: 16,
-                eccKeyLength: 32, eccSignLength: 64, dhCurve: .x25519, signatureCurve: .ed25519)
+                aeadIvLength: 12, hashAlgorithm: .shake256_512, hashLength: 64, macLength: 16,
+                eccKeyLength: 56, eccSignLength: 114, dhCurve: .x448, signatureCurve: .ed448)
         }
     }
 }

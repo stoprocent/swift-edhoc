@@ -33,6 +33,14 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             // RFC 9528: P-256 public keys on the wire use x-coordinate only (32 bytes)
             let publicKeyData = Data(privateKey.publicKey.x963Representation.dropFirst().prefix(32))
             return KeyPair(publicKey: publicKeyData, privateKey: privateKeyData)
+        case .p384:
+            let privateKey = P384.KeyAgreement.PrivateKey()
+            let privateKeyData = Data(privateKey.rawRepresentation)
+            // RFC 9528: P-384 public keys on the wire use x-coordinate only (48 bytes)
+            let publicKeyData = Data(privateKey.publicKey.x963Representation.dropFirst().prefix(48))
+            return KeyPair(publicKey: publicKeyData, privateKey: privateKeyData)
+        case .x448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 
@@ -65,6 +73,22 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             }
             let sharedSecret = try privKey.sharedSecretFromKeyAgreement(with: publicKey)
             return sharedSecret.withUnsafeBytes { Data($0) }
+        case .p384:
+            let privKey = try P384.KeyAgreement.PrivateKey(rawRepresentation: privateKey)
+            let publicKey: P384.KeyAgreement.PublicKey
+            if peerPublicKey.count == 48 {
+                publicKey = try P384.KeyAgreement.PublicKey(compactRepresentation: peerPublicKey)
+            } else if peerPublicKey.count == 97 && peerPublicKey[0] == 0x04 {
+                publicKey = try P384.KeyAgreement.PublicKey(x963Representation: peerPublicKey)
+            } else {
+                var x963Data = Data([0x04])
+                x963Data.append(peerPublicKey)
+                publicKey = try P384.KeyAgreement.PublicKey(x963Representation: x963Data)
+            }
+            let sharedSecret = try privKey.sharedSecretFromKeyAgreement(with: publicKey)
+            return sharedSecret.withUnsafeBytes { Data($0) }
+        case .x448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 
@@ -85,6 +109,13 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             let signature = try privKey.signature(for: digest)
             // Return compact r||s (64 bytes)
             return signature.rawRepresentation
+        case .p384:
+            let privKey = try P384.Signing.PrivateKey(rawRepresentation: privateKey)
+            let digest = CryptoKit.SHA384.hash(data: input)
+            let signature = try privKey.signature(for: digest)
+            return signature.rawRepresentation
+        case .ed448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 
@@ -114,6 +145,22 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             let ecdsaSignature = try P256.Signing.ECDSASignature(rawRepresentation: signature)
             let digest = CryptoKit.SHA256.hash(data: input)
             return p256PubKey.isValidSignature(ecdsaSignature, for: digest)
+        case .p384:
+            let p384PubKey: P384.Signing.PublicKey
+            if publicKey.count == 48 {
+                p384PubKey = try P384.Signing.PublicKey(compactRepresentation: publicKey)
+            } else if publicKey.count == 97 && publicKey[0] == 0x04 {
+                p384PubKey = try P384.Signing.PublicKey(x963Representation: publicKey)
+            } else {
+                var x963Data = Data([0x04])
+                x963Data.append(publicKey)
+                p384PubKey = try P384.Signing.PublicKey(x963Representation: x963Data)
+            }
+            let ecdsaSignature = try P384.Signing.ECDSASignature(rawRepresentation: signature)
+            let digest = CryptoKit.SHA384.hash(data: input)
+            return p384PubKey.isValidSignature(ecdsaSignature, for: digest)
+        case .ed448:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 
@@ -138,6 +185,8 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             hmac.update(data: ikm)
             let mac = hmac.finalize()
             return Data(mac)
+        case .shake256_512:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 
@@ -163,6 +212,8 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
                 outputByteCount: length
             )
             return okm.withUnsafeBytes { Data($0) }
+        case .shake256_512:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 
@@ -222,6 +273,8 @@ open class CryptoKitProvider: EdhocCryptoProvider, @unchecked Sendable {
             return Data(CryptoKit.SHA256.hash(data: data))
         case .sha384:
             return Data(CryptoKit.SHA384.hash(data: data))
+        case .shake256_512:
+            throw EdhocError.unsupportedCipherSuite(selected: suite.rawValue, peerSuites: [suite.rawValue])
         }
     }
 

@@ -84,6 +84,12 @@ final class CBORTests: XCTestCase {
         XCTAssertEqual(cid.toBytes(), Data([0xDE, 0xAD]))
     }
 
+    func testConnectionIDToBytesOutOfRangeUsesFullCBORIntegerEncoding() {
+        let cid = EdhocConnectionID.integer(24)
+        XCTAssertEqual(cid.toBytes(), Data([0x18, 0x18]))
+        XCTAssertEqual(EdhocConnectionID.integer(-25).toBytes(), Data([0x38, 0x18]))
+    }
+
     // MARK: - Connection ID from CBOR
 
     func testConnectionIDFromCBORUnsignedInt() throws {
@@ -109,23 +115,40 @@ final class CBORTests: XCTestCase {
 
     func testConnectionIDCBORRoundTripPositive() throws {
         let original = EdhocConnectionID.integer(7)
-        let cbor = CBORUtils.connectionIDToCBOR(original)
+        let cbor = try CBORUtils.connectionIDToCBOR(original)
         let recovered = try CBORUtils.connectionIDFromCBOR(cbor)
         XCTAssertEqual(recovered, original)
     }
 
     func testConnectionIDCBORRoundTripNegative() throws {
         let original = EdhocConnectionID.integer(-5)
-        let cbor = CBORUtils.connectionIDToCBOR(original)
+        let cbor = try CBORUtils.connectionIDToCBOR(original)
         let recovered = try CBORUtils.connectionIDFromCBOR(cbor)
         XCTAssertEqual(recovered, original)
     }
 
     func testConnectionIDCBORRoundTripByteString() throws {
         let original = EdhocConnectionID.byteString(Data([0xAB, 0xCD]))
-        let cbor = CBORUtils.connectionIDToCBOR(original)
+        let cbor = try CBORUtils.connectionIDToCBOR(original)
         let recovered = try CBORUtils.connectionIDFromCBOR(cbor)
         XCTAssertEqual(recovered, original)
+    }
+
+    func testConnectionIDCBORCanonicalizesSingleByteBstr() throws {
+        let original = EdhocConnectionID.byteString(Data([0x2b])) // CBOR int -12
+        let cbor = try CBORUtils.connectionIDToCBOR(original)
+        let recovered = try CBORUtils.connectionIDFromCBOR(cbor)
+        XCTAssertEqual(recovered, .integer(-12))
+    }
+
+    func testConnectionIDFromCBOROutOfRangeCanonicalizesToByteString() throws {
+        let cid = try CBORUtils.connectionIDFromCBOR(.unsignedInt(24))
+        XCTAssertEqual(cid, .byteString(Data([0x18, 0x18])))
+    }
+
+    func testConnectionIDToCBOROutOfRangeEncodesAsByteStringOfCBORInteger() throws {
+        let cbor = try CBORUtils.connectionIDToCBOR(.integer(24))
+        XCTAssertEqual(cbor, .byteString([0x18, 0x18]))
     }
 
     // MARK: - EAD Round-Trip
@@ -197,6 +220,19 @@ final class CBORTests: XCTestCase {
             XCTAssertEqual(data, kidData)
         } else {
             XCTFail("Expected .kid(.byteString)")
+        }
+    }
+
+    func testIDCredMapKidDecodesInnerCBOR() throws {
+        // {4: h'2b'} where 0x2b is CBOR encoding of -12
+        let map = CBOR.map([
+            .unsignedInt(UInt64(EdhocCredentialsFormat.kid.rawValue)): .byteString([0x2b]),
+        ])
+        let parsed = try CBORCredentials.decodeIDCred(map)
+        if case .kid(let kidCred) = parsed, case .integer(let n) = kidCred.kid {
+            XCTAssertEqual(n, -12)
+        } else {
+            XCTFail("Expected .kid(.integer(-12))")
         }
     }
 

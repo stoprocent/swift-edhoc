@@ -366,8 +366,15 @@ public final class X509CredentialProvider: EdhocCredentialProvider, @unchecked S
         switch signatureCurve {
         case .p256:
             return try extractP256PublicKey(from: cert)
+        case .p384:
+            return try extractP384PublicKey(from: cert)
         case .ed25519:
             return try extractEd25519PublicKey(from: cert)
+        case .ed448:
+            throw EdhocError.unsupportedCipherSuite(
+                selected: info.selectedSuite.rawValue,
+                peerSuites: [info.selectedSuite.rawValue]
+            )
         }
     }
 
@@ -382,6 +389,18 @@ public final class X509CredentialProvider: EdhocCredentialProvider, @unchecked S
         // x963Representation is 0x04 || x (32 bytes) || y (32 bytes) = 65 bytes
         let x963 = p256Key.x963Representation
         // Strip the 0x04 uncompressed point prefix
+        return Data(x963.dropFirst())
+    }
+
+    /// Extract a P-384 public key from the certificate.
+    /// Returns the 96-byte raw x||y representation (X9.63 without the 0x04 prefix).
+    private func extractP384PublicKey(from cert: Certificate) throws -> Data {
+        guard let p384Key = P384.Signing.PublicKey(cert.publicKey) else {
+            throw EdhocError.missingKeyMaterial(
+                "Certificate does not contain a P-384 public key"
+            )
+        }
+        let x963 = p384Key.x963Representation
         return Data(x963.dropFirst())
     }
 
