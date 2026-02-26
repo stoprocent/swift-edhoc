@@ -17,17 +17,16 @@ Add the dependency to your `Package.swift`:
 ```swift
 import SwiftEDHOC
 
-// Set up the credential provider with your DER-encoded certificate chain
+// Set up the credential provider with your DER-encoded certificate chain and private key
 let credentialProvider = X509CredentialProvider(
     certificates: [myLeafCertDER],
-    cryptoKeyID: myPrivateKeyID
+    privateKey: myPrivateKeyBytes          // raw private key bytes (e.g. 32 bytes for P-256)
 )
 credentialProvider.addTrustedCA(caCertDER)
 credentialProvider.addPeerCertificate(peerCertDER)
 
 // Set up the crypto provider
 let crypto = CryptoKitProvider()
-crypto.addKey(keyID: myPrivateKeyID, key: myPrivateKeyBytes)
 
 // Create a session and run the handshake
 let initiator = EdhocSession(
@@ -109,14 +108,14 @@ let peerPublicKeyY = Data(hex: "4519e257236b2a0ce2023f0931f1f386ca7afda64fcde010
 let peerCCS = buildCCS(subject: "example.edu", kid: -19, curve: 1,
                        publicKeyX: peerPublicKeyX, publicKeyY: peerPublicKeyY)
 
-// --- Step 2: Register credentials ---
+// --- Step 2: Register credentials (private key is bundled with own credential) ---
 
 var credentialProvider = CCSCredentialProvider()
 credentialProvider.addOwnCredential(
     kid: .integer(-12),             // kid value
     ccsBytes: myCCS,                // CBOR-encoded CCS
     publicKey: myPublicKeyX,        // public key (x-coordinate only, 32 bytes)
-    privateKeyID: myPrivateKeyID    // opaque ID for the crypto provider's key store
+    privateKey: myPrivateKeyBytes   // raw P-256 private key (32 bytes)
 )
 credentialProvider.addPeerCredential(
     kid: .integer(-19),
@@ -124,10 +123,9 @@ credentialProvider.addPeerCredential(
     publicKey: peerPublicKeyX
 )
 
-// --- Step 3: Set up crypto and register private key ---
+// --- Step 3: Set up crypto provider ---
 
 let crypto = CryptoKitProvider()
-crypto.addKey(keyID: myPrivateKeyID, key: myPrivateKeyBytes)  // P-256 private key (32 bytes)
 
 // --- Step 4: Create session (Method 3 = StaticDH both sides) ---
 
