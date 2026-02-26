@@ -26,11 +26,9 @@ public struct KIDCredential: Sendable {
     }
 }
 
-/// KID value can be an integer or byte string
-public enum KIDValue: Sendable, Equatable {
-    case integer(Int)
-    case byteString(Data)
-}
+/// KID value uses the same bstr_identifier encoding as connection IDs (RFC 9528 Section 3.3.2).
+/// One-byte byte strings that map to a CBOR integer (-24..23) are canonicalized to integer form.
+public typealias KIDValue = EdhocConnectionID
 
 /// X.509 certificate chain credential
 public struct X5ChainCredential: Sendable {

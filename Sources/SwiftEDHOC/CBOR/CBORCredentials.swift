@@ -6,18 +6,13 @@ public enum CBORCredentials {
 
     /// Encode ID_CRED_x: the credential identifier in CBOR
     ///
-    /// - KID: bare CBOR value (integer or byte string)
+    /// - KID: bstr_identifier encoding per RFC 9528 Section 3.3.2
     /// - x5chain: CBOR map {33: bstr} or {33: [bstr, ...]}
     /// - x5t: CBOR map {34: [alg, hash]}
     public static func encodeIDCred(_ credential: EdhocCredential) -> Data {
         switch credential {
         case .kid(let kidCred):
-            switch kidCred.kid {
-            case .integer(let n):
-                return CBORSerialization.encode(CBORSerialization.toCBOR(n))
-            case .byteString(let data):
-                return CBORSerialization.encode(.byteString(Array(data)))
-            }
+            return CBORSerialization.encode(CBORUtils.bstrIdentifierToCBOR(kidCred.kid))
 
         case .x5chain(let x5chain):
             let certValue: CBOR
@@ -53,20 +48,14 @@ public enum CBORCredentials {
     }
 
     /// Encode ID_CRED_x as a CBOR map (full form for MAC context / Sig_structure).
-    /// For kid: {4: bstr(cbor(kid))}; for x5chain/x5t: same as encodeIDCred.
+    /// For kid: {4: kid_bstr} where kid_bstr is the raw key identifier;
+    /// for x5chain/x5t: same as encodeIDCred.
     public static func encodeIDCredMap(_ credential: EdhocCredential) -> Data {
         switch credential {
         case .kid(let kidCred):
-            let kidCbor: CBOR
-            switch kidCred.kid {
-            case .integer(let n):
-                kidCbor = CBORSerialization.toCBOR(n)
-            case .byteString(let data):
-                kidCbor = .byteString(Array(data))
-            }
-            let kidBytes = CBORSerialization.encode(kidCbor)
+            let kidRawBytes = kidCred.kid.toBytes()
             let map: CBOR = .map([
-                .unsignedInt(UInt64(EdhocCredentialsFormat.kid.rawValue)): .byteString(Array(kidBytes))
+                .unsignedInt(UInt64(EdhocCredentialsFormat.kid.rawValue)): .byteString(Array(kidRawBytes))
             ])
             return CBORSerialization.encode(map)
         case .x5chain, .x5t:
@@ -135,7 +124,7 @@ public enum CBORCredentials {
                 return .x5t(X5TCredential(hash: Data(hashBytes), hashAlgorithm: hashAlgorithm))
             }
 
-            // kid in map: {4: ...}
+            // kid in map: {4: kid_bstr}
             let kidKey = CBOR.unsignedInt(UInt64(EdhocCredentialsFormat.kid.rawValue))
             if let value = map[kidKey] {
                 switch value {
@@ -144,18 +133,9 @@ public enum CBORCredentials {
                 case .negativeInt(let n):
                     return .kid(KIDCredential(kid: .integer(-1 - Int(n))))
                 case .byteString(let bytes):
-                    // For full-map kid form, value is bstr(cbor(kid)); decode inner CBOR.
-                    let inner = try CBORSerialization.decode(Data(bytes))
-                    switch inner {
-                    case .unsignedInt(let n):
-                        return .kid(KIDCredential(kid: .integer(Int(n))))
-                    case .negativeInt(let n):
-                        return .kid(KIDCredential(kid: .integer(-1 - Int(n))))
-                    case .byteString(let innerBytes):
-                        return .kid(KIDCredential(kid: .byteString(Data(innerBytes))))
-                    default:
-                        throw EdhocError.cborError("Invalid inner kid value in map")
-                    }
+                    // Map value is the raw kid bstr; canonicalize via bstr_identifier rules
+                    let kid = CBORUtils.bstrIdentifierFromRawBytes(Data(bytes))
+                    return .kid(KIDCredential(kid: kid))
                 default:
                     throw EdhocError.cborError("Invalid kid value in map")
                 }

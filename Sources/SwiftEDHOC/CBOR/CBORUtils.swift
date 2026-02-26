@@ -37,9 +37,32 @@ public enum CBORUtils {
         }
     }
 
-    /// Encode a connection ID as a CBOR item
-    public static func connectionIDToCBOR(_ cid: EdhocConnectionID) throws -> CBOR {
-        switch try canonicalizeConnectionID(cid) {
+    /// Encode a bstr_identifier value as CBOR (RFC 9528 Section 3.3.2).
+    ///
+    /// Shared encoding for connection IDs in EDHOC messages and kid values in
+    /// compact ID_CRED_x. Canonicalizes one-byte byte strings in the integer
+    /// range (-24..23) to integer form, and integers outside that range to
+    /// byte strings containing their CBOR encoding.
+    public static func bstrIdentifierToCBOR(_ value: EdhocConnectionID) -> CBOR {
+        // Canonicalize
+        let canonical: EdhocConnectionID
+        switch value {
+        case .integer(let n):
+            if n >= cidMin && n <= cidMax {
+                canonical = .integer(n)
+            } else {
+                canonical = .byteString(cborBytesForInteger(n))
+            }
+        case .byteString(let data):
+            if data.count == 1, let n = decodeSingleByteCBORInt(data[0]) {
+                canonical = .integer(n)
+            } else {
+                canonical = .byteString(data)
+            }
+        }
+
+        // Convert to CBOR
+        switch canonical {
         case .integer(let n):
             if n >= 0 {
                 return .unsignedInt(UInt64(n))
@@ -49,6 +72,22 @@ public enum CBORUtils {
         case .byteString(let data):
             return .byteString(Array(data))
         }
+    }
+
+    /// Convert raw bstr_identifier bytes back to a canonicalized value.
+    ///
+    /// Reverses `toBytes()`: one-byte values that correspond to a CBOR integer
+    /// in -24..23 are returned as `.integer`, others as `.byteString`.
+    public static func bstrIdentifierFromRawBytes(_ data: Data) -> EdhocConnectionID {
+        if data.count == 1, let n = decodeSingleByteCBORInt(data[0]) {
+            return .integer(n)
+        }
+        return .byteString(data)
+    }
+
+    /// Encode a connection ID as a CBOR item
+    public static func connectionIDToCBOR(_ cid: EdhocConnectionID) throws -> CBOR {
+        bstrIdentifierToCBOR(cid)
     }
 
     private static func decodeSingleByteCBORInt(_ b: UInt8) -> Int? {
